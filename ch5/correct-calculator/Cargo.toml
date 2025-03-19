@@ -1,0 +1,8 @@
+[package]
+name = "correct-calculator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Evan J. Williams <evanjpw@gmail.com>"]
+description = "A calculator implementation demonstrating Rust design patterns"
+
+[dependencies]

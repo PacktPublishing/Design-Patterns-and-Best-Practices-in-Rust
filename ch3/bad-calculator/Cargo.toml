@@ -1,0 +1,20 @@
+[package]
+name = "bad-calculator-ch3"
+version = "0.1.0"
+edition = "2021"
+authors = ["Evan J. Williams <evanjpw@gmail.com>"]
+description = "Examples of anti-patterns from Chapter 3"
+
+[dependencies]
+
+[[bin]]
+name = "ownership-concerns"
+path = "src/ownership_concerns.rs"
+
+[[bin]]
+name = "cloning-everything"
+path = "src/cloning_everything.rs"
+
+[[bin]]
+name = "rc-and-refcell"
+path = "src/rc_and_refcell.rs"

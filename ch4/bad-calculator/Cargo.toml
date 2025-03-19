@@ -1,0 +1,21 @@
+[package]
+name = "bad-calculator-ch4"
+version = "0.1.0"
+edition = "2021"
+authors = ["Evan J. Williams <evanjpw@gmail.com>"]
+description = "Examples of anti-patterns from Chapter 4"
+
+[dependencies]
+lazy_static = "1.4.0"
+
+[[bin]]
+name = "fighting-borrow-checker"
+path = "src/fighting_borrow_checker.rs"
+
+[[bin]]
+name = "unsafe-example"
+path = "src/unsafe_example.rs"
+
+[[bin]]
+name = "global-state"
+path = "src/global_state.rs"
