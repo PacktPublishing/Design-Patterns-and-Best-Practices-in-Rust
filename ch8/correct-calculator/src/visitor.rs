@@ -6,7 +6,7 @@ use crate::expression::{Expression, NumberExpression, VariableExpression, Binary
 use crate::token::{Operator, Function};
 
 // Visitable interface for expressions
-pub trait Visitable {
+pub trait Visitable: Send + Sync {
     fn accept(&self, visitor: &mut dyn ExpressionVisitor) -> Result<(), String>;
     
     // Allow downcasting from trait object
@@ -20,9 +20,6 @@ pub trait ExpressionVisitor {
     fn visit_binary_op(&mut self, expr: &BinaryOperation) -> Result<(), String>;
     fn visit_function_call(&mut self, expr: &FunctionCall) -> Result<(), String>;
 }
-
-// Extend the Expression trait to include Visitable
-pub trait VisitableExpression: Expression + Visitable {}
 
 // Implementation of Visitable for each expression type
 impl Visitable for NumberExpression {
@@ -47,32 +44,8 @@ impl Visitable for VariableExpression {
 
 impl Visitable for BinaryOperation {
     fn accept(&self, visitor: &mut dyn ExpressionVisitor) -> Result<(), String> {
-        // First visit the children recursively
-        if let Some(left) = self.left.as_any().downcast_ref::<NumberExpression>() {
-            left.accept(visitor)?;
-        } else if let Some(left) = self.left.as_any().downcast_ref::<VariableExpression>() {
-            left.accept(visitor)?;
-        } else if let Some(left) = self.left.as_any().downcast_ref::<BinaryOperation>() {
-            left.accept(visitor)?;
-        } else if let Some(left) = self.left.as_any().downcast_ref::<FunctionCall>() {
-            left.accept(visitor)?;
-        }
-        
-        // Then visit this node
-        visitor.visit_binary_op(self)?;
-        
-        // Finally visit the right child
-        if let Some(right) = self.right.as_any().downcast_ref::<NumberExpression>() {
-            right.accept(visitor)?;
-        } else if let Some(right) = self.right.as_any().downcast_ref::<VariableExpression>() {
-            right.accept(visitor)?;
-        } else if let Some(right) = self.right.as_any().downcast_ref::<BinaryOperation>() {
-            right.accept(visitor)?;
-        } else if let Some(right) = self.right.as_any().downcast_ref::<FunctionCall>() {
-            right.accept(visitor)?;
-        }
-        
-        Ok(())
+        // First visit this node
+        visitor.visit_binary_op(self)
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -82,56 +55,12 @@ impl Visitable for BinaryOperation {
 
 impl Visitable for FunctionCall {
     fn accept(&self, visitor: &mut dyn ExpressionVisitor) -> Result<(), String> {
-        // First visit the argument recursively
-        if let Some(arg) = self.argument.as_any().downcast_ref::<NumberExpression>() {
-            arg.accept(visitor)?;
-        } else if let Some(arg) = self.argument.as_any().downcast_ref::<VariableExpression>() {
-            arg.accept(visitor)?;
-        } else if let Some(arg) = self.argument.as_any().downcast_ref::<BinaryOperation>() {
-            arg.accept(visitor)?;
-        } else if let Some(arg) = self.argument.as_any().downcast_ref::<FunctionCall>() {
-            arg.accept(visitor)?;
-        }
-        
-        // Then visit this node
+        // Visit this node
         visitor.visit_function_call(self)
     }
     
     fn as_any(&self) -> &dyn Any {
         self
-    }
-}
-
-// Ensure Expression types implement As_Any
-impl Expression for dyn Visitable {
-    fn evaluate(&self, variables: &HashMap<String, f64>) -> Result<f64, String> {
-        // This is a bit of a hack, but it allows us to downcast visitor objects
-        if let Some(expr) = self.as_any().downcast_ref::<NumberExpression>() {
-            expr.evaluate(variables)
-        } else if let Some(expr) = self.as_any().downcast_ref::<VariableExpression>() {
-            expr.evaluate(variables)
-        } else if let Some(expr) = self.as_any().downcast_ref::<BinaryOperation>() {
-            expr.evaluate(variables)
-        } else if let Some(expr) = self.as_any().downcast_ref::<FunctionCall>() {
-            expr.evaluate(variables)
-        } else {
-            Err("Unknown expression type".to_string())
-        }
-    }
-    
-    fn to_string(&self) -> String {
-        // Similar implementation as above
-        if let Some(expr) = self.as_any().downcast_ref::<NumberExpression>() {
-            expr.to_string()
-        } else if let Some(expr) = self.as_any().downcast_ref::<VariableExpression>() {
-            expr.to_string()
-        } else if let Some(expr) = self.as_any().downcast_ref::<BinaryOperation>() {
-            expr.to_string()
-        } else if let Some(expr) = self.as_any().downcast_ref::<FunctionCall>() {
-            expr.to_string()
-        } else {
-            "Unknown expression".to_string()
-        }
     }
 }
 
@@ -149,12 +78,22 @@ impl OptimizationVisitor {
         }
     }
     
-    pub fn optimize(&mut self, expr: &dyn Visitable) -> Result<Box<dyn Expression>, String> {
-        expr.accept(self)?;
+    pub fn optimize(&mut self, expr: &dyn Expression) -> Result<Box<dyn Expression>, String> {
+        if let Some(num) = expr.as_any().downcast_ref::<NumberExpression>() {
+            self.visit_number(num)?;
+        } else if let Some(var) = expr.as_any().downcast_ref::<VariableExpression>() {
+            self.visit_variable(var)?;
+        } else if let Some(op) = expr.as_any().downcast_ref::<BinaryOperation>() {
+            self.visit_binary_op(op)?;
+        } else if let Some(func) = expr.as_any().downcast_ref::<FunctionCall>() {
+            self.visit_function_call(func)?;
+        } else {
+            return Ok(expr.clone_box());
+        }
         
         match &self.optimized_expression {
-            Some(optimized) => Ok(optimized.clone()),
-            None => Err("Optimization failed".to_string()),
+            Some(optimized) => Ok(optimized.clone_box()),
+            None => Ok(expr.clone_box()),
         }
     }
     
@@ -166,11 +105,9 @@ impl OptimizationVisitor {
         }
     }
     
-    fn optimize_subexpression(&mut self, expr: &dyn Visitable) -> Result<Box<dyn Expression>, String> {
+    fn optimize_subexpression(&mut self, expr: &dyn Expression) -> Result<Box<dyn Expression>, String> {
         let saved = self.optimized_expression.take();
-        expr.accept(self)?;
-        let result = self.optimized_expression.take()
-            .ok_or_else(|| "Failed to optimize subexpression".to_string())?;
+        let result = self.optimize(expr)?;
         self.optimized_expression = saved;
         Ok(result)
     }
@@ -195,17 +132,8 @@ impl ExpressionVisitor for OptimizationVisitor {
     
     fn visit_binary_op(&mut self, expr: &BinaryOperation) -> Result<(), String> {
         // Optimize left and right subexpressions
-        let left_opt = if let Some(left) = expr.left.as_any().downcast_ref::<dyn Visitable>() {
-            self.optimize_subexpression(left)?
-        } else {
-            expr.left.clone()
-        };
-        
-        let right_opt = if let Some(right) = expr.right.as_any().downcast_ref::<dyn Visitable>() {
-            self.optimize_subexpression(right)?
-        } else {
-            expr.right.clone()
-        };
+        let left_opt = self.optimize_subexpression(&*expr.left)?;
+        let right_opt = self.optimize_subexpression(&*expr.right)?;
         
         // If both operands are constants, evaluate them
         if let (Some(left_val), Some(right_val)) = (
@@ -312,11 +240,7 @@ impl ExpressionVisitor for OptimizationVisitor {
     
     fn visit_function_call(&mut self, expr: &FunctionCall) -> Result<(), String> {
         // Optimize the argument
-        let arg_opt = if let Some(arg) = expr.argument.as_any().downcast_ref::<dyn Visitable>() {
-            self.optimize_subexpression(arg)?
-        } else {
-            expr.argument.clone()
-        };
+        let arg_opt = self.optimize_subexpression(&*expr.argument)?;
         
         // If the argument is a constant, evaluate the function
         if let Some(arg_val) = self.get_constant_value(&*arg_opt) {
@@ -362,8 +286,23 @@ impl ValidationVisitor {
         }
     }
     
-    pub fn validate(&mut self, expr: &dyn Visitable) -> Result<(), String> {
-        expr.accept(self)?;
+    pub fn validate(&mut self, expr: &dyn Expression) -> Result<(), String> {
+        if let Some(num) = expr.as_any().downcast_ref::<NumberExpression>() {
+            self.visit_number(num)?;
+        } else if let Some(var) = expr.as_any().downcast_ref::<VariableExpression>() {
+            self.visit_variable(var)?;
+        } else if let Some(op) = expr.as_any().downcast_ref::<BinaryOperation>() {
+            self.visit_binary_op(op)?;
+            
+            // Validate operands
+            self.validate(&*op.left)?;
+            self.validate(&*op.right)?;
+        } else if let Some(func) = expr.as_any().downcast_ref::<FunctionCall>() {
+            self.visit_function_call(func)?;
+            
+            // Validate argument
+            self.validate(&*func.argument)?;
+        }
         
         if self.errors.is_empty() {
             Ok(())
@@ -424,22 +363,12 @@ impl ExpressionVisitor for ValidationVisitor {
 
 // Function to optimize an expression
 pub fn optimize_expression(expr: &dyn Expression, variables: &HashMap<String, f64>) -> Result<Box<dyn Expression>, String> {
-    if let Some(visitable) = expr.as_any().downcast_ref::<dyn Visitable>() {
-        let mut visitor = OptimizationVisitor::new(variables.clone());
-        visitor.optimize(visitable)
-    } else {
-        // If not visitable, return as-is
-        Ok(Box::new(expr.clone()))
-    }
+    let mut visitor = OptimizationVisitor::new(variables.clone());
+    visitor.optimize(expr)
 }
 
 // Function to validate an expression
 pub fn validate_expression(expr: &dyn Expression) -> Result<(), String> {
-    if let Some(visitable) = expr.as_any().downcast_ref::<dyn Visitable>() {
-        let mut visitor = ValidationVisitor::new();
-        visitor.validate(visitable)
-    } else {
-        // If not visitable, assume valid
-        Ok(())
-    }
+    let mut visitor = ValidationVisitor::new();
+    visitor.validate(expr)
 }

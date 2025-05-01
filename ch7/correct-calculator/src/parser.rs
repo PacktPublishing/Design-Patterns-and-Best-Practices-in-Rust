@@ -47,9 +47,13 @@ impl ExpressionParser {
                 },
                 Token::Operator(op) => {
                     // While there's an operator on the stack with greater precedence
-                    while let Some(Token::Operator(top_op)) = operator_stack.last() {
-                        if top_op.precedence() >= op.precedence() {
-                            operator_stack.pop();
+                    while let Some(&Token::Operator(ref top_op)) = operator_stack.last() {
+                        // Compare precedence before mutably borrowing
+                        let higher_precedence = top_op.precedence() >= op.precedence();
+                        
+                        if higher_precedence {
+                            // Now we can pop the operator safely 
+                            let top_token = operator_stack.pop().unwrap();
                             
                             if output_queue.len() < 2 {
                                 return Err("Invalid expression: not enough operands".to_string());
@@ -58,7 +62,10 @@ impl ExpressionParser {
                             let right = output_queue.pop().unwrap();
                             let left = output_queue.pop().unwrap();
                             
-                            output_queue.push(Box::new(BinaryOperation::new(left, right, top_op.clone())));
+                            // Extract the operator
+                            if let Token::Operator(top_operator) = top_token {
+                                output_queue.push(Box::new(BinaryOperation::new(left, right, top_operator)));
+                            }
                         } else {
                             break;
                         }
@@ -82,15 +89,20 @@ impl ExpressionParser {
                                 found_open_paren = true;
                                 
                                 // If there's a function on the stack, apply it
-                                if let Some(Token::Function(func)) = operator_stack.last() {
-                                    operator_stack.pop();
+                                if let Some(Token::Function(_)) = operator_stack.last() {
+                                    // Get the function token first to avoid borrow issues
+                                    let func_token = operator_stack.pop().unwrap();
                                     
                                     if output_queue.is_empty() {
                                         return Err("Invalid function call: missing argument".to_string());
                                     }
                                     
                                     let arg = output_queue.pop().unwrap();
-                                    output_queue.push(Box::new(FunctionCall::new(func.clone(), arg)));
+                                    
+                                    // Now safely extract the function
+                                    if let Token::Function(func) = func_token {
+                                        output_queue.push(Box::new(FunctionCall::new(func, arg)));
+                                    }
                                 }
                                 
                                 break;

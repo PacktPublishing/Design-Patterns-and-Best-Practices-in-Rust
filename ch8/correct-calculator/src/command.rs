@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use crate::expression::Expression;
 
 // Command interface
-pub trait Command {
-    fn execute(&self, calculator: &mut Calculator) -> Result<Option<f64>, String>;
-    fn undo(&self, calculator: &mut Calculator) -> Result<(), String>;
+pub trait Command: Send + Sync {
+    fn execute(&mut self, calculator: &mut Calculator) -> Result<Option<f64>, String>;
+    fn undo(&mut self, calculator: &mut Calculator) -> Result<(), String>;
     fn description(&self) -> String;
 }
 
@@ -79,7 +79,7 @@ impl EvaluateCommand {
 }
 
 impl Command for EvaluateCommand {
-    fn execute(&self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
+    fn execute(&mut self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
         self.previous_result = calculator.last_result;
         
         let result = self.expr_tree.evaluate(&calculator.variables)?;
@@ -88,7 +88,7 @@ impl Command for EvaluateCommand {
         Ok(Some(result))
     }
     
-    fn undo(&self, calculator: &mut Calculator) -> Result<(), String> {
+    fn undo(&mut self, calculator: &mut Calculator) -> Result<(), String> {
         // Remove the last entry from history
         if !calculator.history.is_empty() {
             calculator.history.pop();
@@ -123,13 +123,13 @@ impl SetVariableCommand {
 }
 
 impl Command for SetVariableCommand {
-    fn execute(&self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
+    fn execute(&mut self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
         self.previous_value = calculator.get_variable(&self.name);
         calculator.set_variable(&self.name, self.value);
         Ok(None)
     }
     
-    fn undo(&self, calculator: &mut Calculator) -> Result<(), String> {
+    fn undo(&mut self, calculator: &mut Calculator) -> Result<(), String> {
         match self.previous_value {
             Some(value) => {
                 calculator.set_variable(&self.name, value);
@@ -161,13 +161,13 @@ impl ClearVariablesCommand {
 }
 
 impl Command for ClearVariablesCommand {
-    fn execute(&self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
+    fn execute(&mut self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
         self.previous_variables = Some(calculator.variables.clone());
         calculator.variables.clear();
         Ok(None)
     }
     
-    fn undo(&self, calculator: &mut Calculator) -> Result<(), String> {
+    fn undo(&mut self, calculator: &mut Calculator) -> Result<(), String> {
         if let Some(vars) = &self.previous_variables {
             calculator.variables = vars.clone();
             Ok(())
@@ -197,7 +197,7 @@ impl CommandProcessor {
         }
     }
     
-    pub fn execute(&mut self, command: Box<dyn Command>) -> Result<Option<f64>, String> {
+    pub fn execute(&mut self, mut command: Box<dyn Command>) -> Result<Option<f64>, String> {
         let result = command.execute(&mut self.calculator)?;
         self.history.push(command);
         self.undo_stack.clear(); // Clear redo stack after new command
@@ -205,7 +205,7 @@ impl CommandProcessor {
     }
     
     pub fn undo(&mut self) -> Result<(), String> {
-        if let Some(command) = self.history.pop() {
+        if let Some(mut command) = self.history.pop() {
             command.undo(&mut self.calculator)?;
             self.undo_stack.push(command);
             Ok(())
@@ -215,7 +215,7 @@ impl CommandProcessor {
     }
     
     pub fn redo(&mut self) -> Result<(), String> {
-        if let Some(command) = self.undo_stack.pop() {
+        if let Some(mut command) = self.undo_stack.pop() {
             command.execute(&mut self.calculator)?;
             self.history.push(command);
             Ok(())

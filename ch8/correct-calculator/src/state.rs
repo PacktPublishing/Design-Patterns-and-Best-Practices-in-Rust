@@ -87,7 +87,25 @@ impl StateCalculator {
     }
     
     pub fn process_input(&mut self, input: &str) -> Result<Option<f64>, String> {
-        self.state.handle_input(input, self)
+        // Create a cloned input to avoid lifetime issues
+        let input_owned = input.to_string();
+        
+        // Get a reference to the current state implementation
+        let state_type = self.state.name().to_string();
+        
+        // Use helper functions to process the input based on state type
+        match state_type.as_str() {
+            "Standard" => {
+                match_standard_input(&input_owned, self)
+            },
+            "Scientific" => {
+                match_scientific_input(&input_owned, self)
+            },
+            "Programmer" => {
+                match_programmer_input(&input_owned, self)
+            },
+            _ => Err(format!("Unknown state type: {}", state_type))
+        }
     }
     
     pub fn store_result(&mut self, input: String, result: f64) {
@@ -100,12 +118,149 @@ impl StateCalculator {
     }
 }
 
+// Helper functions to avoid borrowing conflicts
+fn match_standard_input(input: &str, calculator: &mut StateCalculator) -> Result<Option<f64>, String> {
+    // Replicate the standard mode logic to avoid borrowing issues
+    if input.starts_with("mode") {
+        // Change mode based on command
+        let mode = input.trim_start_matches("mode").trim();
+        match mode {
+            "scientific" => {
+                calculator.change_state(Box::new(ScientificMode::new()));
+                Ok(None)
+            },
+            "programmer" => {
+                calculator.change_state(Box::new(ProgrammerMode::new()));
+                Ok(None)
+            },
+            _ => Err(format!("Unknown mode: {}", mode)),
+        }
+    } else if input.starts_with("help") {
+        println!("Available operations: +, -, *, /, ^");
+        println!("Type 'mode scientific' or 'mode programmer' to switch modes");
+        Ok(None)
+    } else if let Some((var_name, expression)) = input.split_once('=') {
+        let var_name = var_name.trim();
+        let expression = expression.trim();
+        
+        // Evaluate the expression and set the variable
+        let expr = calculator.parser.parse(expression)?;
+        let result = expr.evaluate(&calculator.variables)?;
+        calculator.variables.insert(var_name.to_string(), result);
+        calculator.store_result(format!("{} = {}", var_name, expression), result);
+        Ok(Some(result))
+    } else {
+        // Normal expression evaluation
+        let expr = calculator.parser.parse(input)?;
+        let result = expr.evaluate(&calculator.variables)?;
+        calculator.store_result(input.to_string(), result);
+        Ok(Some(result))
+    }
+}
+
+fn match_scientific_input(input: &str, calculator: &mut StateCalculator) -> Result<Option<f64>, String> {
+    // Replicate the scientific mode logic
+    if input.starts_with("mode") {
+        // Handle mode change
+        let mode = input.trim_start_matches("mode").trim();
+        match mode {
+            "standard" => {
+                calculator.change_state(Box::new(StandardMode::new()));
+                Ok(None)
+            },
+            "programmer" => {
+                calculator.change_state(Box::new(ProgrammerMode::new()));
+                Ok(None)
+            },
+            _ => Err(format!("Unknown mode: {}", mode)),
+        }
+    } else if input == "angle deg" {
+        // Change angle mode to degrees
+        calculator.change_state(Box::new(ScientificMode {
+            sci_ops: Box::new(crate::adapter::StandardScientificOperations {
+                angle_mode: AngleMode::Degrees,
+            }),
+            angle_mode: AngleMode::Degrees,
+        }));
+        println!("Angle mode set to degrees");
+        Ok(None)
+    } else if input == "angle rad" {
+        // Change angle mode to radians
+        calculator.change_state(Box::new(ScientificMode {
+            sci_ops: Box::new(crate::adapter::StandardScientificOperations {
+                angle_mode: AngleMode::Radians,
+            }),
+            angle_mode: AngleMode::Radians,
+        }));
+        println!("Angle mode set to radians");
+        Ok(None)
+    } else if input.starts_with("help") {
+        println!("Available operations: +, -, *, /, ^, sin, cos, tan, log, ln, sqrt");
+        println!("Type 'mode standard' or 'mode programmer' to switch modes");
+        println!("Type 'angle deg' or 'angle rad' to change angle mode");
+        Ok(None)
+    } else {
+        // For other scientific operations, use a generic approach
+        // that doesn't depend on the ScientificMode specifics
+        let expr = calculator.parser.parse(input)?;
+        let result = expr.evaluate(&calculator.variables)?;
+        calculator.store_result(input.to_string(), result);
+        Ok(Some(result))
+    }
+}
+
+fn match_programmer_input(input: &str, calculator: &mut StateCalculator) -> Result<Option<f64>, String> {
+    // Simplified programmer mode logic
+    if input.starts_with("mode") {
+        // Handle mode change
+        let mode = input.trim_start_matches("mode").trim();
+        match mode {
+            "standard" => {
+                calculator.change_state(Box::new(StandardMode::new()));
+                Ok(None)
+            },
+            "scientific" => {
+                calculator.change_state(Box::new(ScientificMode::new()));
+                Ok(None)
+            },
+            _ => Err(format!("Unknown mode: {}", mode)),
+        }
+    } else if input.starts_with("base") {
+        // Change number base
+        let base = input.trim_start_matches("base").trim();
+        let new_base = match base {
+            "bin" | "binary" => NumberBase::Binary,
+            "oct" | "octal" => NumberBase::Octal,
+            "dec" | "decimal" => NumberBase::Decimal,
+            "hex" | "hexadecimal" => NumberBase::Hexadecimal,
+            _ => return Err(format!("Unknown base: {}", base)),
+        };
+        
+        calculator.change_state(Box::new(ProgrammerMode { base: new_base }));
+        println!("Base set to {:?}", new_base);
+        Ok(None)
+    } else if input.starts_with("help") {
+        println!("Available operations: +, -, *, /, AND, OR, XOR, NOT, SHL, SHR");
+        println!("Type 'mode standard' or 'mode scientific' to switch modes");
+        println!("Type 'base bin', 'base oct', 'base dec', or 'base hex' to change base");
+        println!("Bitwise operations: AND, OR, XOR, NOT, SHL, SHR");
+        Ok(None)
+    } else {
+        // Generic evaluation for other operations
+        let expr = calculator.parser.parse(input)?;
+        let result = expr.evaluate(&calculator.variables)?;
+        calculator.store_result(input.to_string(), result);
+        Ok(Some(result))
+    }
+}
+
 // State interface
-pub trait CalculatorState {
+pub trait CalculatorState: Send + Sync {
     fn name(&self) -> &str;
     fn handle_input(&self, input: &str, calculator: &mut StateCalculator) -> Result<Option<f64>, String>;
     fn available_operations(&self) -> Vec<&'static str>;
     fn display_prompt(&self) -> String;
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 // Standard calculator mode
@@ -115,9 +270,8 @@ pub struct StandardMode {
 
 impl StandardMode {
     pub fn new() -> Self {
-        use crate::adapter::StandardScientificOperations;
         Self {
-            sci_ops: Box::new(StandardScientificOperations {
+            sci_ops: Box::new(crate::adapter::StandardScientificOperations {
                 angle_mode: AngleMode::Radians,
             }),
         }
@@ -175,6 +329,10 @@ impl CalculatorState for StandardMode {
     fn display_prompt(&self) -> String {
         "[Standard] > ".to_string()
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 // Scientific calculator mode
@@ -185,9 +343,8 @@ pub struct ScientificMode {
 
 impl ScientificMode {
     pub fn new() -> Self {
-        use crate::adapter::StandardScientificOperations;
         Self {
-            sci_ops: Box::new(StandardScientificOperations {
+            sci_ops: Box::new(crate::adapter::StandardScientificOperations {
                 angle_mode: AngleMode::Radians,
             }),
             angle_mode: AngleMode::Radians,
@@ -302,6 +459,10 @@ impl CalculatorState for ScientificMode {
             AngleMode::Radians => "[Scientific (RAD)] > ".to_string(),
             AngleMode::Degrees => "[Scientific (DEG)] > ".to_string(),
         }
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -429,7 +590,7 @@ impl CalculatorState for ProgrammerMode {
             let expression = expression.trim();
             
             // Try to parse according to current base
-            let result = if !expression.contains(|c: char| c.is_ascii_letter() || "+-*/()^".contains(c)) {
+            let result = if !expression.contains(|c: char| c.is_alphabetic() || "+-*/()^".contains(c)) {
                 match self.base.parse(expression) {
                     Ok(value) => value,
                     Err(_) => {
@@ -469,5 +630,9 @@ impl CalculatorState for ProgrammerMode {
             NumberBase::Decimal => "[Programmer (DEC)] > ".to_string(),
             NumberBase::Hexadecimal => "[Programmer (HEX)] > ".to_string(),
         }
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

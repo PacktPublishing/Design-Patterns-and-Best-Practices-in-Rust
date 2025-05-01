@@ -59,7 +59,7 @@ pub fn get_global_config() -> &'static CalculatorConfig {
 }
 
 // Thread-safe calculator with shared config
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct CalculatorPool {
     shared_config: Arc<CalculatorConfig>,

@@ -244,7 +244,7 @@ impl CalculatorMediator for CalculatorMediatorImpl {
     }
     
     fn change_angle_mode(&mut self, mode: AngleMode) {
-        self.angle_mode = mode;
+        self.angle_mode = mode.clone(); // Clone to avoid the moved value error
         
         let mode_str = match mode {
             AngleMode::Degrees => "Degrees",
@@ -256,23 +256,21 @@ impl CalculatorMediator for CalculatorMediatorImpl {
 }
 
 // Helper function to set up mediator system
-pub fn create_mediator_system() -> Arc<Mutex<dyn CalculatorMediator>> {
-    // Create mediator
-    let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()) as Mutex<dyn CalculatorMediator>);
+pub fn create_mediator_system() -> Arc<Mutex<CalculatorMediatorImpl>> {
+    // Create mediator as a concrete type
+    let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
     
     // Create components
     let evaluator = Arc::new(EvaluationComponent::new(mediator.clone()));
     let variables = Arc::new(Mutex::new(VariableStorage::new(mediator.clone())));
-    let display = Arc::new(Mutex::new(ConsoleDisplay::new(mediator.clone())) as Mutex<dyn Display>);
+    let display = Arc::new(Mutex::new(ConsoleDisplay::new(mediator.clone())));
     
     // Register components with mediator
     {
         let mut mediator_lock = mediator.lock().unwrap();
-        if let Some(mediator_impl) = mediator_lock.downcast_mut::<CalculatorMediatorImpl>() {
-            mediator_impl.set_evaluator(evaluator);
-            mediator_impl.set_variables(variables);
-            mediator_impl.set_display(display);
-        }
+        mediator_lock.set_evaluator(evaluator);
+        mediator_lock.set_variables(variables);
+        mediator_lock.set_display(display);
     }
     
     mediator

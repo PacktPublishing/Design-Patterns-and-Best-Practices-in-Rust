@@ -6,8 +6,8 @@ mod factory;
 mod builder;
 mod config;
 
-use token::{Token, Operator, Function, NumberFormat};
-use factory::{TokenFactory, StandardFactory, ScientificFactory};
+use token::{Token, Operator, Function};
+use factory::{TokenFactory, StandardFactory, ScientificFactory, NumberToken};
 use builder::ExpressionBuilder;
 use config::CalculatorConfig;
 
@@ -45,9 +45,8 @@ fn main() {
         .number(3.0)
         .operator(Operator::Multiply)
         .number(4.0)
-        .close_paren()
-        .build()
-        .unwrap();
+        .close_paren().unwrap()  // close_paren returns Result<Self, String>
+        .build().unwrap();
     
     println!("Built expression: {:?}", expr);
     

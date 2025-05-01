@@ -33,7 +33,8 @@ pub trait ExpressionEvaluator {
         tokens
     }
     
-    fn validate_tokens(&self, tokens: &[Token]) -> Result<(), String> {
+    // Base validation implementation that can be called by overriding implementations
+    fn base_validate_tokens(&self, tokens: &[Token]) -> Result<(), String> {
         // Default validation implementation
         if tokens.is_empty() {
             return Err("Empty expression".to_string());
@@ -60,6 +61,10 @@ pub trait ExpressionEvaluator {
         }
         
         Ok(())
+    }
+    
+    fn validate_tokens(&self, tokens: &[Token]) -> Result<(), String> {
+        self.base_validate_tokens(tokens)
     }
     
     // Steps that implementations must provide
@@ -233,8 +238,9 @@ impl ExpressionEvaluator for ShuntingYardEvaluator {
     
     // Custom validation specific to shunting yard
     fn validate_tokens(&self, tokens: &[Token]) -> Result<(), String> {
-        // Call the default implementation
-        <Self as ExpressionEvaluator>::validate_tokens(self, tokens)?;
+        // Perform default validation first
+        // Instead of calling self, call the trait's default implementation directly
+        self.base_validate_tokens(tokens)?;
         
         // Additional validation for shunting yard
         let mut operand_count = 0;

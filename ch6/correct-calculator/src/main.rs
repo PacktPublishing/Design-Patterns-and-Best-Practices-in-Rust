@@ -18,10 +18,10 @@ use std::collections::HashMap;
 use token::{Token, Operator, Function};
 use expression::{Expression, NumberExpression, VariableExpression, BinaryOperation, FunctionCall};
 use decorator::{ConsoleLogger, LoggingExpression, TimingExpression};
-use adapter::{StandardScientificOperations, ExternalLibraryAdapter};
-use facade::CalculatorFacade;
-use bridge::{CalculatorDisplay, ConsoleDisplay, HtmlDisplay, JsonDisplay,
+use bridge::{Display, ConsoleDisplay, HtmlDisplay, JsonDisplay, CalculatorDisplay,
              StandardEvaluator, OptimizingEvaluator, Evaluator};
+use adapter::{StandardScientificOperations, ExternalLibraryAdapter, ScientificOperations};
+use facade::CalculatorFacade;
 use config::{CalculatorConfig, AngleMode};
 
 fn main() {
@@ -68,9 +68,20 @@ fn main() {
     // Demonstrate Decorator Pattern
     println!("\n== Decorator Pattern ==");
     
+    // Create identical expressions for each decorator since we can't clone
+    let add_for_logging = Box::new(BinaryOperation {
+        left: Box::new(NumberExpression { value: 2.0 }),
+        right: Box::new(BinaryOperation {
+            left: Box::new(NumberExpression { value: 3.0 }),
+            right: Box::new(NumberExpression { value: 4.0 }),
+            operator: Operator::Multiply,
+        }),
+        operator: Operator::Add,
+    });
+    
     // Create a logging decorated expression
     let logging_expr = LoggingExpression::new(
-        add.clone(),
+        add_for_logging,
         Box::new(ConsoleLogger),
     );
     
@@ -80,9 +91,20 @@ fn main() {
         Err(e) => println!("Final error: {}", e),
     }
     
+    // Create another expression for timing
+    let add_for_timing = Box::new(BinaryOperation {
+        left: Box::new(NumberExpression { value: 2.0 }),
+        right: Box::new(BinaryOperation {
+            left: Box::new(NumberExpression { value: 3.0 }),
+            right: Box::new(NumberExpression { value: 4.0 }),
+            operator: Operator::Multiply,
+        }),
+        operator: Operator::Add,
+    });
+    
     // Create a timing decorated expression
     let timing_expr = TimingExpression::new(
-        add.clone(),
+        add_for_timing,
     );
     
     println!("\nEvaluating with timing:");

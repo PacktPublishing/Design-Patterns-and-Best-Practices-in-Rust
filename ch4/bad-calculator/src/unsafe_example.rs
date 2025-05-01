@@ -68,7 +68,7 @@ impl BadCalculator {
         }
 
         // Regular expression evaluation
-        let tokens = expression.split_whitespace().collect();
+        let tokens: Vec<String> = expression.split_whitespace().map(|s| s.to_string()).collect();
         let result = self.evaluate_tokens(&tokens)?;
         
         // Cache the new expression
@@ -152,7 +152,7 @@ impl SafeCalculator {
                 .ok_or_else(|| "No expression before previous".to_string());
         }
 
-        let tokens = expression.split_whitespace().collect();
+        let tokens: Vec<String> = expression.split_whitespace().map(|s| s.to_string()).collect();
         let result = self.evaluate_tokens(&tokens)?;
         
         self.expressions.push(Expression { tokens, result });

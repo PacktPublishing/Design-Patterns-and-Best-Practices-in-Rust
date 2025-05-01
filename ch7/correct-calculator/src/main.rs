@@ -173,8 +173,9 @@ mod adapter {
 }
 
 use std::io::{self, Write};
-use chain::create_input_chain;
+use chain::{create_input_chain, InputHandler};
 use command::CommandProcessor;
+use mediator::CalculatorMediator;
 use parser::ExpressionParser;
 
 fn main() {

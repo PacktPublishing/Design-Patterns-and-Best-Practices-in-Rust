@@ -47,18 +47,22 @@ impl ExpressionParser {
                 },
                 Token::Operator(op) => {
                     // While there's an operator on the stack with greater precedence
-                    while let Some(Token::Operator(top_op)) = operator_stack.last() {
-                        if top_op.precedence() >= op.precedence() {
-                            operator_stack.pop();
-                            
-                            if output_queue.len() < 2 {
-                                return Err("Invalid expression: not enough operands".to_string());
+                    loop {
+                        if let Some(Token::Operator(top_op)) = operator_stack.last().cloned() {
+                            if top_op.precedence() >= op.precedence() {
+                                operator_stack.pop();
+                                
+                                if output_queue.len() < 2 {
+                                    return Err("Invalid expression: not enough operands".to_string());
+                                }
+                                
+                                let right = output_queue.pop().unwrap();
+                                let left = output_queue.pop().unwrap();
+                                
+                                output_queue.push(Box::new(BinaryOperation::new(left, right, top_op)));
+                            } else {
+                                break;
                             }
-                            
-                            let right = output_queue.pop().unwrap();
-                            let left = output_queue.pop().unwrap();
-                            
-                            output_queue.push(Box::new(BinaryOperation::new(left, right, top_op.clone())));
                         } else {
                             break;
                         }
@@ -82,7 +86,7 @@ impl ExpressionParser {
                                 found_open_paren = true;
                                 
                                 // If there's a function on the stack, apply it
-                                if let Some(Token::Function(func)) = operator_stack.last() {
+                                if let Some(Token::Function(func)) = operator_stack.last().cloned() {
                                     operator_stack.pop();
                                     
                                     if output_queue.is_empty() {
@@ -90,7 +94,7 @@ impl ExpressionParser {
                                     }
                                     
                                     let arg = output_queue.pop().unwrap();
-                                    output_queue.push(Box::new(FunctionCall::new(func.clone(), arg)));
+                                    output_queue.push(Box::new(FunctionCall::new(func, arg)));
                                 }
                                 
                                 break;

@@ -6,7 +6,7 @@ use crate::parser::ExpressionParser;
 // Handler interface
 pub trait InputHandler {
     fn handle(&self, input: &str, processor: &mut CommandProcessor) -> Result<Option<f64>, String>;
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self;
+    fn set_next(&mut self, next: Box<dyn InputHandler>);
 }
 
 // Base implementation for chaining
@@ -29,9 +29,8 @@ impl InputHandler for BaseHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.next = Some(next);
-        self
     }
 }
 
@@ -86,9 +85,8 @@ impl InputHandler for CommandHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 
@@ -134,9 +132,8 @@ impl InputHandler for VariableAssignmentHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 
@@ -169,14 +166,13 @@ impl InputHandler for ExpressionHandler {
         processor.execute(command)
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 
 // Function to create the chain of handlers
-pub fn create_input_chain(parser: ExpressionParser) -> Box<dyn InputHandler> {
+pub fn create_input_chain(parser: ExpressionParser) -> Box<CommandHandler> {
     let mut command_handler = CommandHandler::new();
     let mut var_handler = VariableAssignmentHandler::new(parser.clone());
     let expr_handler = ExpressionHandler::new(parser);

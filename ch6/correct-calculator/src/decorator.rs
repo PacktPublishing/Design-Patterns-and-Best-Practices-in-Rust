@@ -80,23 +80,24 @@ impl Expression for TimingExpression {
 }
 
 // A decorator that caches evaluation results
+use std::cell::RefCell;
+
 pub struct CachingExpression {
     inner: Box<dyn Expression>,
-    // In a real implementation, we might use a more sophisticated caching strategy
-    // and handle variable-dependent caching properly
-    last_result: Option<f64>,
+    // Using RefCell for interior mutability
+    last_result: RefCell<Option<f64>>,
 }
 
 impl CachingExpression {
     pub fn new(inner: Box<dyn Expression>) -> Self {
         Self { 
             inner,
-            last_result: None,
+            last_result: RefCell::new(None),
         }
     }
     
-    pub fn invalidate_cache(&mut self) {
-        self.last_result = None;
+    pub fn invalidate_cache(&self) {
+        *self.last_result.borrow_mut() = None;
     }
 }
 
@@ -104,15 +105,13 @@ impl Expression for CachingExpression {
     fn evaluate(&self, variables: &HashMap<String, f64>) -> Result<f64, String> {
         // In a real implementation, we would need to check if variables have changed
         // For this example, we're keeping it simple
-        if let Some(result) = self.last_result {
+        if let Some(result) = *self.last_result.borrow() {
             return Ok(result);
         }
         
         let result = self.inner.evaluate(variables)?;
-        // In a real implementation, we'd use interior mutability for thread safety
-        // But for demonstration, we're using Option directly
-        let mut_self = unsafe { &mut *(self as *const Self as *mut Self) };
-        mut_self.last_result = Some(result);
+        // Using interior mutability with RefCell
+        *self.last_result.borrow_mut() = Some(result);
         
         Ok(result)
     }

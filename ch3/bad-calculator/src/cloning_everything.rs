@@ -69,10 +69,11 @@ impl BadCalculator {
 
             // Get operands (more cloning!)
             let left = working_tokens[op_pos - 1].clone();
+            let operator = working_tokens[op_pos].clone();
             let right = working_tokens[op_pos + 1].clone();
 
             // Calculate result
-            let result = self.apply_operator(left, right)?;
+            let result = self.apply_operator(left, operator, right)?;
 
             // Remove old tokens and insert result
             working_tokens.drain(op_pos - 1..=op_pos + 1);
@@ -85,7 +86,7 @@ impl BadCalculator {
         }
     }
     
-    fn apply_operator(&self, left: Token, right: Token) -> Result<f64, String> {
+    fn apply_operator(&self, left: Token, operator: Token, right: Token) -> Result<f64, String> {
         let left_val = match left {
             Token::Number(n) => n,
             Token::Variable(var) => var.value,
@@ -98,7 +99,7 @@ impl BadCalculator {
             _ => return Err("Expected number or variable".to_string()),
         };
         
-        match working_tokens[op_pos] {
+        match operator {
             Token::Operator('+') => Ok(left_val + right_val),
             Token::Operator('-') => Ok(left_val - right_val),
             Token::Operator('*') => Ok(left_val * right_val),

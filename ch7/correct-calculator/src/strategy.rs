@@ -222,9 +222,13 @@ impl ShuntingYardStrategy {
                 },
                 Token::Operator(op) => {
                     // While there's an operator on the stack with greater precedence
-                    while let Some(Token::Operator(top_op)) = operator_stack.last() {
-                        if top_op.precedence() >= op.precedence() {
-                            operator_stack.pop();
+                    while let Some(&Token::Operator(ref top_op)) = operator_stack.last() {
+                        // Compare precedence before mutably borrowing
+                        let higher_precedence = top_op.precedence() >= op.precedence();
+                        
+                        if higher_precedence {
+                            // Now we can pop the operator safely 
+                            let top_token = operator_stack.pop().unwrap();
                             
                             if output_queue.len() < 2 {
                                 return Err("Invalid expression: not enough operands".to_string());
@@ -233,7 +237,10 @@ impl ShuntingYardStrategy {
                             let right = output_queue.pop().unwrap();
                             let left = output_queue.pop().unwrap();
                             
-                            output_queue.push(Box::new(BinaryOperation::new(left, right, top_op.clone())));
+                            // Extract the operator
+                            if let Token::Operator(top_operator) = top_token {
+                                output_queue.push(Box::new(BinaryOperation::new(left, right, top_operator)));
+                            }
                         } else {
                             break;
                         }
@@ -249,36 +256,45 @@ impl ShuntingYardStrategy {
                 },
                 Token::CloseParen => {
                     // Pop until matching open paren
-                    while let Some(top) = operator_stack.last() {
-                        if let Token::OpenParen = top {
-                            operator_stack.pop();
-                            
-                            // If there's a function on the stack, apply it
-                            if let Some(Token::Function(func)) = operator_stack.last() {
-                                operator_stack.pop();
-                                
-                                if output_queue.is_empty() {
-                                    return Err("Invalid function call: missing argument".to_string());
+                    while let Some(top) = operator_stack.last().cloned() { // Clone to avoid mutable borrow issues
+                        match top {
+                            Token::OpenParen => {
+                                operator_stack.pop(); // Remove the open paren
+
+                                // Check if there's a function next
+                                if let Some(Token::Function(_)) = operator_stack.last() {
+                                    // Get the function token first
+                                    if let Some(func_token) = operator_stack.pop() {
+                                        if output_queue.is_empty() {
+                                            return Err("Invalid function call: missing argument".to_string());
+                                        }
+                                        
+                                        let arg = output_queue.pop().unwrap();
+                                        
+                                        // Extract the function
+                                        if let Token::Function(func) = func_token {
+                                            output_queue.push(Box::new(FunctionCall::new(func, arg)));
+                                        }
+                                    }
                                 }
                                 
-                                let arg = output_queue.pop().unwrap();
-                                output_queue.push(Box::new(FunctionCall::new(func.clone(), arg)));
+                                break;
+                            },
+                            Token::Operator(op) => {
+                                operator_stack.pop(); // Remove the operator
+                                
+                                if output_queue.len() < 2 {
+                                    return Err("Invalid expression: not enough operands".to_string());
+                                }
+                                
+                                let right = output_queue.pop().unwrap();
+                                let left = output_queue.pop().unwrap();
+                                
+                                output_queue.push(Box::new(BinaryOperation::new(left, right, op)));
+                            },
+                            _ => {
+                                operator_stack.pop();
                             }
-                            
-                            break;
-                        } else if let Token::Operator(op) = top {
-                            operator_stack.pop();
-                            
-                            if output_queue.len() < 2 {
-                                return Err("Invalid expression: not enough operands".to_string());
-                            }
-                            
-                            let right = output_queue.pop().unwrap();
-                            let left = output_queue.pop().unwrap();
-                            
-                            output_queue.push(Box::new(BinaryOperation::new(left, right, op.clone())));
-                        } else {
-                            operator_stack.pop();
                         }
                     }
                 }

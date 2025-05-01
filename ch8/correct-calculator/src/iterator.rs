@@ -94,38 +94,6 @@ impl ExpressionExt for FunctionCall {
     fn as_function(&self) -> Option<&FunctionCall> { Some(self) }
 }
 
-// Iterator for traversing expression trees (depth-first)
-pub struct ExpressionIterator<'a> {
-    stack: Vec<&'a dyn Expression>,
-}
-
-impl<'a> ExpressionIterator<'a> {
-    pub fn new(root: &'a dyn Expression) -> Self {
-        let mut stack = Vec::new();
-        stack.push(root);
-        Self { stack }
-    }
-}
-
-impl<'a> Iterator for ExpressionIterator<'a> {
-    type Item = &'a dyn Expression;
-    
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(node) = self.stack.pop() {
-            // Push children onto stack for depth-first traversal
-            if let Some(op) = node.as_binary_op() {
-                self.stack.push(&*op.right);
-                self.stack.push(&*op.left);
-            } else if let Some(func) = node.as_function() {
-                self.stack.push(&*func.argument);
-            }
-            Some(node)
-        } else {
-            None
-        }
-    }
-}
-
 // Variables map iterator
 pub struct VariablesIterator<'a> {
     inner: std::collections::hash_map::Iter<'a, String, f64>,
@@ -147,16 +115,69 @@ impl<'a> Iterator for VariablesIterator<'a> {
     }
 }
 
-// Helper function to collect constants from an expression
-pub fn find_constant_nodes<'a>(expr: &'a dyn Expression) -> Vec<&'a dyn Expression> {
-    ExpressionIterator::new(expr)
-        .filter(|node| node.is_constant())
-        .collect()
+// Non-recursive approach to collecting expressions
+pub fn find_constant_nodes(expr: &dyn Expression) -> Vec<Box<dyn Expression>> {
+    let mut result = Vec::new();
+    collect_nodes_by_type(expr, NodeType::Constant, &mut result);
+    result
 }
 
-// Helper function to collect variable nodes from an expression
-pub fn find_variable_nodes<'a>(expr: &'a dyn Expression) -> Vec<&'a dyn Expression> {
-    ExpressionIterator::new(expr)
-        .filter(|node| node.as_variable().is_some())
-        .collect()
+pub fn find_variable_nodes(expr: &dyn Expression) -> Vec<Box<dyn Expression>> {
+    let mut result = Vec::new();
+    collect_nodes_by_type(expr, NodeType::Variable, &mut result);
+    result
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum NodeType {
+    Constant,
+    Variable,
+}
+
+// Helper function to collect nodes by type without using an iterator
+fn collect_nodes_by_type(expr: &dyn Expression, node_type: NodeType, result: &mut Vec<Box<dyn Expression>>) {
+    if let Some(op) = expr.as_any().downcast_ref::<BinaryOperation>() {
+        // Check if the node matches the criteria
+        match node_type {
+            NodeType::Constant => {
+                if op.is_constant() {
+                    result.push(op.clone_box());
+                }
+            },
+            NodeType::Variable => {
+                if let Some(_) = op.as_variable() {
+                    result.push(op.clone_box());
+                }
+            },
+        }
+        
+        // Process children recursively
+        collect_nodes_by_type(&*op.left, node_type, result);
+        collect_nodes_by_type(&*op.right, node_type, result);
+    } else if let Some(func) = expr.as_any().downcast_ref::<FunctionCall>() {
+        // Check if the node matches the criteria
+        match node_type {
+            NodeType::Constant => {
+                if func.is_constant() {
+                    result.push(func.clone_box());
+                }
+            },
+            NodeType::Variable => {
+                if let Some(_) = func.as_variable() {
+                    result.push(func.clone_box());
+                }
+            },
+        }
+        
+        // Process argument recursively
+        collect_nodes_by_type(&*func.argument, node_type, result);
+    } else if let Some(num) = expr.as_any().downcast_ref::<NumberExpression>() {
+        if node_type == NodeType::Constant {
+            result.push(num.clone_box());
+        }
+    } else if let Some(var) = expr.as_any().downcast_ref::<VariableExpression>() {
+        if node_type == NodeType::Variable {
+            result.push(var.clone_box());
+        }
+    }
 }

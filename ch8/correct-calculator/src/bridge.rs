@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::expression::Expression;
 
 // Display interface (abstraction)
-pub trait Display {
+pub trait Display: Send + Sync {
     fn show_result(&self, result: f64);
     fn show_error(&self, error: &str);
     fn show_expression(&self, expression: &dyn Expression);

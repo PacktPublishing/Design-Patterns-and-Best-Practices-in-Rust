@@ -96,14 +96,16 @@ impl EvaluationStrategy for StandardEvaluator {
     }
 }
 
+use std::cell::RefCell;
+
 pub struct OptimizingEvaluator {
-    cache: std::collections::HashMap<String, f64>,
+    cache: RefCell<std::collections::HashMap<String, f64>>,
 }
 
 impl OptimizingEvaluator {
     pub fn new() -> Self {
         Self {
-            cache: std::collections::HashMap::new(),
+            cache: RefCell::new(std::collections::HashMap::new()),
         }
     }
 }
@@ -115,16 +117,15 @@ impl EvaluationStrategy for OptimizingEvaluator {
         
         // In a real implementation, we'd properly account for variable values in the key
         // For demonstration, this is simplified
-        if let Some(cached_result) = self.cache.get(&key) {
+        if let Some(cached_result) = self.cache.borrow().get(&key) {
             return Ok(*cached_result);
         }
         
         // Evaluate and cache the result
         let result = expression.evaluate(variables)?;
         
-        // In a real implementation, we'd use interior mutability for thread safety
-        let mut_self = unsafe { &mut *(self as *const Self as *mut Self) };
-        mut_self.cache.insert(key, result);
+        // Using RefCell for thread-safe interior mutability
+        self.cache.borrow_mut().insert(key, result);
         
         Ok(result)
     }

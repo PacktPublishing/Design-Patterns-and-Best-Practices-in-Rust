@@ -233,8 +233,30 @@ impl ExpressionEvaluator for ShuntingYardEvaluator {
     
     // Custom validation specific to shunting yard
     fn validate_tokens(&self, tokens: &[Token]) -> Result<(), String> {
-        // Call the default implementation
-        <Self as ExpressionEvaluator>::validate_tokens(self, tokens)?;
+        // Do the basic validation inline to avoid recursive calls
+        if tokens.is_empty() {
+            return Err("No tokens to evaluate".to_string());
+        }
+        
+        // Check for balanced parenthesis
+        let mut paren_count = 0;
+        
+        for token in tokens {
+            match token {
+                Token::OpenParen => paren_count += 1,
+                Token::CloseParen => {
+                    paren_count -= 1;
+                    if paren_count < 0 {
+                        return Err("Unbalanced parenthesis".to_string());
+                    }
+                },
+                _ => {},
+            }
+        }
+        
+        if paren_count != 0 {
+            return Err("Unbalanced parenthesis".to_string());
+        }
         
         // Additional validation for shunting yard
         let mut operand_count = 0;

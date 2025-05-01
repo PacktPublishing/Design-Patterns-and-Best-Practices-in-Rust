@@ -41,7 +41,7 @@ impl DisplayObserver {
 
 impl Observer for DisplayObserver {
     fn update(&self, event: &CalculatorEvent) {
-        let mut display = self.display.lock().unwrap();
+        let display = self.display.lock().unwrap();
         match event {
             CalculatorEvent::ResultCalculated(result, expr) => {
                 display.show_result(*result);

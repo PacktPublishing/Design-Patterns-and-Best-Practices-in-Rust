@@ -62,11 +62,18 @@ impl Expression for VariableExpression {
 }
 
 // Composite node for binary operations
-#[derive(Debug, Clone)]
+// Cannot derive Debug and Clone for Box<dyn Expression>
 pub struct BinaryOperation {
     pub left: Box<dyn Expression>,
     pub right: Box<dyn Expression>,
     pub operator: Operator,
+}
+
+// Manual implementation of Debug
+impl std::fmt::Debug for BinaryOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BinaryOperation {{ left: <expr>, right: <expr>, operator: {:?} }}", self.operator)
+    }
 }
 
 impl BinaryOperation {
@@ -135,10 +142,17 @@ impl Expression for BinaryOperation {
 }
 
 // Function call expression
-#[derive(Debug, Clone)]
+// Cannot derive Debug and Clone for Box<dyn Expression>
 pub struct FunctionCall {
     pub function: Function,
     pub argument: Box<dyn Expression>,
+}
+
+// Manual implementation of Debug
+impl std::fmt::Debug for FunctionCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FunctionCall {{ function: {:?}, argument: <expr> }}", self.function)
+    }
 }
 
 impl FunctionCall {

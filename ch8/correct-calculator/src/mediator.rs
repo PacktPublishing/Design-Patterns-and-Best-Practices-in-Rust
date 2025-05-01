@@ -256,23 +256,22 @@ impl CalculatorMediator for CalculatorMediatorImpl {
 }
 
 // Helper function to set up mediator system
-pub fn create_mediator_system() -> Arc<Mutex<dyn CalculatorMediator>> {
+pub fn create_mediator_system() -> Arc<Mutex<CalculatorMediatorImpl>> {
     // Create mediator
-    let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()) as Mutex<dyn CalculatorMediator>);
+    let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
     
     // Create components
     let evaluator = Arc::new(EvaluationComponent::new(mediator.clone()));
     let variables = Arc::new(Mutex::new(VariableStorage::new(mediator.clone())));
-    let display = Arc::new(Mutex::new(ConsoleDisplay::new(mediator.clone())) as Mutex<dyn Display>);
+    let display = Arc::new(Mutex::new(ConsoleDisplay::new(mediator.clone())));
     
     // Register components with mediator
     {
         let mut mediator_lock = mediator.lock().unwrap();
-        if let Some(mediator_impl) = mediator_lock.downcast_mut::<CalculatorMediatorImpl>() {
-            mediator_impl.set_evaluator(evaluator);
-            mediator_impl.set_variables(variables);
-            mediator_impl.set_display(display);
-        }
+        // In this case, we know the concrete type already
+        mediator_lock.set_evaluator(evaluator);
+        mediator_lock.set_variables(variables);
+        mediator_lock.set_display(display);
     }
     
     mediator

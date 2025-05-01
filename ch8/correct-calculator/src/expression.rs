@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::token::{Operator, Function};
 
 // Expression trait defining common behavior
-pub trait Expression {
+pub trait Expression: Send + Sync {
     fn evaluate(&self, variables: &HashMap<String, f64>) -> Result<f64, String>;
     fn to_string(&self) -> String;
     
@@ -92,11 +92,31 @@ impl Expression for VariableExpression {
 }
 
 // Composite node for binary operations
-#[derive(Debug, Clone)]
+// Cannot derive Debug for Box<dyn Expression>, so implement it manually
 pub struct BinaryOperation {
     pub left: Box<dyn Expression>,
     pub right: Box<dyn Expression>,
     pub operator: Operator,
+}
+
+impl std::fmt::Debug for BinaryOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BinaryOperation")
+            .field("left", &self.left.to_string())
+            .field("right", &self.right.to_string())
+            .field("operator", &self.operator)
+            .finish()
+    }
+}
+
+impl Clone for BinaryOperation {
+    fn clone(&self) -> Self {
+        Self {
+            left: self.left.clone_box(),
+            right: self.right.clone_box(),
+            operator: self.operator.clone(),
+        }
+    }
 }
 
 impl BinaryOperation {
@@ -173,10 +193,28 @@ impl Expression for BinaryOperation {
 }
 
 // Function call expression
-#[derive(Debug, Clone)]
+// Implement Debug and Clone manually for FunctionCall
 pub struct FunctionCall {
     pub function: Function,
     pub argument: Box<dyn Expression>,
+}
+
+impl std::fmt::Debug for FunctionCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FunctionCall")
+            .field("function", &self.function)
+            .field("argument", &self.argument.to_string())
+            .finish()
+    }
+}
+
+impl Clone for FunctionCall {
+    fn clone(&self) -> Self {
+        Self {
+            function: self.function.clone(),
+            argument: self.argument.clone_box(),
+        }
+    }
 }
 
 impl FunctionCall {

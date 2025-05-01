@@ -4,9 +4,9 @@ use crate::command::{Command, CommandProcessor, EvaluateCommand, SetVariableComm
 use crate::parser::ExpressionParser;
 
 // Handler interface
-pub trait InputHandler {
+pub trait InputHandler: Send + Sync {
     fn handle(&self, input: &str, processor: &mut CommandProcessor) -> Result<Option<f64>, String>;
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self;
+    fn set_next(&mut self, next: Box<dyn InputHandler>);
 }
 
 // Base implementation for chaining
@@ -29,9 +29,8 @@ impl InputHandler for BaseHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.next = Some(next);
-        self
     }
 }
 
@@ -86,9 +85,8 @@ impl InputHandler for CommandHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 
@@ -134,9 +132,8 @@ impl InputHandler for VariableAssignmentHandler {
         }
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 
@@ -169,9 +166,8 @@ impl InputHandler for ExpressionHandler {
         processor.execute(command)
     }
     
-    fn set_next(&mut self, next: Box<dyn InputHandler>) -> &mut Self {
+    fn set_next(&mut self, next: Box<dyn InputHandler>) {
         self.base.set_next(next);
-        self
     }
 }
 

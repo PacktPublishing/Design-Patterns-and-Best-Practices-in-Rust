@@ -306,15 +306,30 @@ impl CorrectCalculator {
             print!("{} ", self.state.display_prompt());
             io::stdout().flush().unwrap();
 
+            // Use explicit import for stdin to ensure it works properly
+            let stdin = io::stdin();
             let mut input = String::new();
-            if io::stdin().read_line(&mut input).is_err() {
+            
+            // Read from stdin and check length
+            if let Ok(n) = stdin.read_line(&mut input) {
+                if n == 0 {
+                    // End of file or broken pipe
+                    println!("End of input, exiting...");
+                    break;
+                }
+            } else {
                 println!("Error reading input, please try again");
                 continue;
             }
-
+            
             let input = input.trim();
             if input == "/exit" {
                 break;
+            }
+            
+            if input.is_empty() {
+                // Skip empty input
+                continue;
             }
             
             match self.process_input(input) {
