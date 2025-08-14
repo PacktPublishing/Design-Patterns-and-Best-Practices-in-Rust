@@ -1,0 +1,11 @@
+[package]
+name = "samsa"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# No external dependencies for Chapter 9 - using only std library
+
+[[example]]
+name = "basic_pubsub"
+path = "examples/basic_pubsub.rs"
