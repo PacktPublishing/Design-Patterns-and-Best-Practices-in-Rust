@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# No external dependencies for Chapter 9 - using only std library
+thiserror = "2.0"
 
 [[example]]
 name = "basic_pubsub"

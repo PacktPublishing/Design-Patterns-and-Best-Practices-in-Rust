@@ -1,11 +1,14 @@
 use crate::Event;
+use crate::error::Result;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// In-memory storage for messages
-/// 
+///
 /// Represents the bottom of our data flow - data only flows IN
+#[derive(Debug)]
 pub struct Storage {
-    topics: HashMap<String, Vec<Event>>,
+    topics: HashMap<String, Vec<Arc<Event>>>,
 }
 
 impl Storage {
@@ -14,21 +17,23 @@ impl Storage {
             topics: HashMap::new(),
         }
     }
+
     
     /// Append an event to a topic (data flowing DOWN)
-    pub fn append(&mut self, topic: &str, event: Event) -> Result<(), String> {
+    pub fn append(&mut self, topic: String, event: Event) -> Result<()> {
         self.topics
-            .entry(topic.to_string())
-            .or_insert_with(Vec::new)
-            .push(event);
+            .entry(topic)
+            .or_default()
+            .push(Arc::new(event));
         Ok(())
     }
     
     /// Fetch events from a topic (data flowing UP to caller)
-    /// 
+    ///
     /// Note: This is the one place where data flows upward, but it's a query
     /// operation, not state mutation. The storage itself doesn't change.
-    pub fn fetch(&self, topic: &str, from_offset: u64, max_events: usize) -> Result<Vec<Event>, String> {
+    /// Returns Arc<Event> to avoid cloning message payloads.
+    pub fn fetch(&self, topic: &str, from_offset: u64, max_events: usize) -> Result<Vec<Arc<Event>>> {
         let events = self.topics
             .get(topic)
             .map(|events| {
@@ -39,11 +44,16 @@ impl Storage {
                     .collect()
             })
             .unwrap_or_default();
-        
+
         Ok(events)
     }
     
     /// Get the latest offset for a topic
+    ///
+    /// Note: This method is part of the Storage API contract shown in the chapter text
+    /// (see StorageBackend trait). While not currently called in the implementation,
+    /// it demonstrates the interface that storage backends should provide.
+    #[allow(dead_code)]
     pub fn latest_offset(&self, topic: &str) -> u64 {
         self.topics
             .get(topic)

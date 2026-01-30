@@ -1,4 +1,4 @@
-use samsa::{Broker, Producer, Consumer, Message};
+use samsa::{Broker, Producer, Consumer};
 use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

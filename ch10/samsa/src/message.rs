@@ -1,7 +1,5 @@
-use std::time::Instant;
-
 /// A message flowing through the Samsa system
-/// 
+///
 /// Messages are immutable once created and flow downward:
 /// Producer -> Broker -> Consumer
 #[derive(Debug, Clone)]
@@ -9,7 +7,7 @@ pub struct Message {
     pub topic: String,
     pub key: Option<String>,
     pub value: Vec<u8>,
-    pub timestamp: Instant,
+    pub timestamp: u64,
 }
 
 impl Message {
@@ -18,7 +16,7 @@ impl Message {
             topic: topic.into(),
             key,
             value: value.into(),
-            timestamp: Instant::now(),
+            timestamp: current_timestamp(),
         }
     }
     
@@ -51,4 +49,11 @@ impl Event {
     pub fn new(message: Message, offset: u64) -> Self {
         Self { message, offset }
     }
+}
+
+pub fn current_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
